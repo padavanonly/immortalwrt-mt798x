@@ -3867,17 +3867,9 @@ static int mtk_start_dma(struct mtk_eth *eth)
 
 	if (MTK_HAS_CAPS(eth->soc->caps, MTK_QDMA)) {
 		val = mtk_r32(eth, reg_map->qdma.glo_cfg);
-		if (MTK_HAS_CAPS(eth->soc->caps, MTK_NETSYS_V3)) {
+		if (MTK_HAS_CAPS(eth->soc->caps, MTK_NETSYS_V2) ||
+		    MTK_HAS_CAPS(eth->soc->caps, MTK_NETSYS_V3)) {
 			val &= ~(MTK_RESV_BUF_MASK | MTK_DMA_SIZE_MASK);
-			mtk_w32(eth,
-				val | MTK_TX_DMA_EN | MTK_RX_DMA_EN |
-				MTK_DMA_SIZE_16DWORDS | MTK_TX_WB_DDONE |
-				MTK_NDP_CO_PRO | MTK_MUTLI_CNT |
-				MTK_RESV_BUF | MTK_WCOMP_EN |
-				MTK_DMAD_WR_WDONE | MTK_CHK_DDONE_EN |
-				MTK_RX_2B_OFFSET, reg_map->qdma.glo_cfg);
-		} else if (MTK_HAS_CAPS(eth->soc->caps, MTK_NETSYS_V2)) {
-			val &= ~MTK_RESV_BUF_MASK;
 			mtk_w32(eth,
 				val | MTK_TX_DMA_EN | MTK_RX_DMA_EN |
 				MTK_DMA_SIZE_32DWORDS | MTK_TX_WB_DDONE |
@@ -4417,7 +4409,7 @@ static int mtk_hw_init(struct mtk_eth *eth, u32 type)
 
 		/* GDM and CDM Threshold */
 		mtk_w32(eth, 0x00000004, MTK_CDM2_THRES);
-		mtk_w32(eth, 0x00000707, MTK_CDMW0_THRES);
+		mtk_w32(eth, 0x08000707, MTK_CDMW0_THRES);
 		mtk_w32(eth, 0x00000077, MTK_CDMW1_THRES);
 
 		/* Disable GDM1 RX CRC stripping */

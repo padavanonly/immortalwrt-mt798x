@@ -455,7 +455,7 @@ unsigned int do_hnat_ext_to_ge(struct sk_buff *skb, const struct net_device *in,
 		}
 
 		/*set where we come from*/
-		__vlan_hwaccel_put_tag(skb, htons(ETH_P_8021Q), in->ifindex & VLAN_VID_MASK);
+		__vlan_hwaccel_put_tag(skb, htons(ETH_P_8021Q), VLAN_CFI_MASK | (in->ifindex & VLAN_VID_MASK));
 		trace_printk(
 			"%s: vlan_prot=0x%x, vlan_tci=%x, in->name=%s, skb->dev->name=%s\n",
 			__func__, ntohs(skb->vlan_proto), skb->vlan_tci,
@@ -730,7 +730,7 @@ unsigned int do_hnat_mape_w2l_fast(struct sk_buff *skb, const struct net_device 
 		eth->h_proto = htons(ETH_P_IP);
 		set_to_ppe(skb);
 
-		__vlan_hwaccel_put_tag(skb, htons(ETH_P_8021Q), in->ifindex & VLAN_VID_MASK);
+		__vlan_hwaccel_put_tag(skb, htons(ETH_P_8021Q), VLAN_CFI_MASK | (in->ifindex & VLAN_VID_MASK));
 		if (!hnat_priv->g_ppdev)
 			hnat_priv->g_ppdev = dev_get_by_name(&init_net, hnat_priv->ppd);
 
@@ -813,6 +813,72 @@ static unsigned int is_ppe_support_type(struct sk_buff *skb)
 
 	return 0;
 }
+
+
+static void mtk_hnat_nf_update(struct sk_buff *skb)
+{
+	struct nf_conn *ct;
+	struct nf_conn_acct *acct;
+	struct nf_conn_counter *counter;
+	enum ip_conntrack_info ctinfo;
+	struct hnat_accounting diff;
+	
+	if (skb->protocol == htons(ETH_P_IPV6) && !hnat_priv->ipv6_en) {
+		return ;
+	}
+
+	if (skb_hnat_alg(skb) || unlikely(!is_magic_tag_valid(skb) ||
+					  !IS_SPACE_AVAILABLE_HEAD(skb)))
+		return ;
+
+	if (unlikely(!skb_mac_header_was_set(skb)))
+		return ;
+
+	if (unlikely(!skb_hnat_is_hashed(skb)))
+		return ;
+		
+	if (unlikely(skb->mark == HNAT_EXCEPTION_TAG))
+		return ;
+ 
+	ct = nf_ct_get(skb, &ctinfo);
+	if (ct) {
+		if (!hnat_get_count(hnat_priv, skb_hnat_ppe(skb), skb_hnat_entry(skb), &diff))
+			return;
+
+		acct = nf_conn_acct_find(ct);
+		
+		if (acct) {
+			counter = acct->counter;
+			atomic64_add(diff.packets, &counter[CTINFO2DIR(ctinfo)].packets);
+			atomic64_add(diff.bytes, &counter[CTINFO2DIR(ctinfo)].bytes);
+			atomic64_set(&counter[CTINFO2DIR(ctinfo)].diff_packets, diff.packets);
+			atomic64_set(&counter[CTINFO2DIR(ctinfo)].diff_bytes, diff.bytes);
+		}
+	}
+}
+
+
+/* update hnat count to nf_conntrack and iptables by keepalive */
+static unsigned int
+mtk_hnat_nf_conntrack(void *priv, struct sk_buff *skb,
+			     const struct nf_hook_state *state)
+{
+	if (!skb)
+		goto drop;
+	
+	if (unlikely(skb_hnat_reason(skb) == HIT_BIND_KEEPALIVE_DUP_OLD_HDR))
+		{
+		if (hnat_priv->data->per_flow_accounting && hnat_priv->nf_stat_en)
+			mtk_hnat_nf_update(skb);}
+		
+	return NF_ACCEPT;
+	
+drop:
+	
+	return NF_DROP;	
+
+}
+
 
 static unsigned int
 mtk_hnat_ipv6_nf_pre_routing(void *priv, struct sk_buff *skb,
@@ -1283,7 +1349,7 @@ static unsigned int skb_to_hnat_info(struct sk_buff *skb,
 	const struct tcpudphdr *pptr;
 	struct nf_conn *ct;
 	enum ip_conntrack_info ctinfo;
-	u32 gmac = NR_DISCARD;
+	int gmac = NR_DISCARD;
 	int udp = 0;
 	u32 qid = 0;
 	u32 port_id = 0;
@@ -1759,33 +1825,32 @@ static unsigned int skb_to_hnat_info(struct sk_buff *skb,
 	entry = ppe_fill_info_blk(eth, entry, hw_path);
 
 	if (IS_LAN(dev)) {
-		if (IS_DSA_LAN(dev))
+		if (IS_BOND_MODE) {
+			gmac = ((skb_hnat_entry(skb) >> 1) % hnat_priv->gmac_num) ?
+				 NR_GMAC2_PORT : NR_GMAC1_PORT;
+		} else if (IS_DSA_LAN(dev)) {
 			port_id = hnat_dsa_fill_stag(dev, &entry, hw_path,
 						     ntohs(eth->h_proto),
 						     mape);
-
-		if (IS_BOND_MODE)
-			gmac = ((skb_hnat_entry(skb) >> 1) % hnat_priv->gmac_num) ?
-				 NR_GMAC2_PORT : NR_GMAC1_PORT;
-		else
 			gmac = NR_GMAC1_PORT;
+		} else {
+			gmac = HNAT_GMAC_FP(mac->id);
+		}
 	} else if (IS_LAN2(dev)) {
-		gmac = (mac->id == MTK_GMAC2_ID) ? NR_GMAC2_PORT : NR_GMAC3_PORT;
+		gmac = HNAT_GMAC_FP(mac->id);
 	} else if (IS_WAN(dev)) {
-		if (IS_DSA_WAN(dev))
-			port_id = hnat_dsa_fill_stag(dev,&entry, hw_path,
-						     ntohs(eth->h_proto),
-						     mape);
 		if (mape_toggle && mape == 1) {
 			gmac = NR_PDMA_PORT;
 			/* Set act_dp = wan_dev */
 			entry.ipv4_hnapt.act_dp &= ~UDF_PINGPONG_IFIDX;
 			entry.ipv4_hnapt.act_dp |= dev->ifindex & UDF_PINGPONG_IFIDX;
+		} else if (IS_DSA_WAN(dev)) {
+			port_id = hnat_dsa_fill_stag(dev, &entry, hw_path,
+						     ntohs(eth->h_proto),
+						     mape);
+			gmac = NR_GMAC1_PORT;
 		} else {
-			if (IS_GMAC1_MODE)
-				gmac = NR_GMAC1_PORT;
-			else
-				gmac = (mac->id == MTK_GMAC2_ID) ? NR_GMAC2_PORT : NR_GMAC3_PORT;
+			gmac = HNAT_GMAC_FP(mac->id);
 		}
 	} else if (IS_EXT(dev) && (FROM_GE_PPD(skb) || FROM_GE_LAN(skb) ||
 		   FROM_GE_WAN(skb) || FROM_GE_VIRTUAL(skb) || FROM_WED(skb) || FROM_EXT(skb))) {
@@ -1961,12 +2026,8 @@ static unsigned int skb_to_hnat_info(struct sk_buff *skb,
 	/*reset statistic for this entry*/
 	if (hnat_priv->data->per_flow_accounting &&
 	    skb_hnat_entry(skb) < hnat_priv->foe_etry_num &&
-	    skb_hnat_ppe(skb) < CFG_PPE_NUM){
-		memset(&hnat_priv->acct[skb_hnat_ppe(skb)][skb_hnat_entry(skb)],
-		        0, sizeof(struct hnat_accounting));
-		hnat_priv->acct[skb_hnat_ppe(skb)][skb_hnat_entry(skb)].nfct = skb_get_nfct(skb);
-	}
-
+	    skb_hnat_ppe(skb) < CFG_PPE_NUM)
+		memset(&hnat_priv->acct[skb_hnat_ppe(skb)][skb_hnat_entry(skb)],0, sizeof(struct mib_entry));
 	return 0;
 }
 
@@ -2441,6 +2502,7 @@ static void mtk_hnat_dscp_update(struct sk_buff *skb, struct foe_entry *entry)
 }
 
 
+
 int mtk_464xlat_fill_mac(struct foe_entry *entry, struct sk_buff *skb,
 			 const struct net_device *out, bool l2w)
 {
@@ -2788,7 +2850,7 @@ static unsigned int mtk_hnat_nf_post_routing(
 	case HIT_BIND_KEEPALIVE_DUP_OLD_HDR:
 		/* update hnat count to nf_conntrack by keepalive */
 		if (hnat_priv->data->per_flow_accounting && hnat_priv->nf_stat_en)
-			hnat_get_count(hnat_priv, skb_hnat_ppe(skb), skb_hnat_entry(skb), NULL);
+			mtk_hnat_nf_update(skb);
 
 		if (fn && !mtk_hnat_accel_type(skb))
 			break;
@@ -3077,6 +3139,18 @@ static unsigned int mtk_hnat_br_nf_forward(void *priv,
 }
 
 static struct nf_hook_ops mtk_hnat_nf_ops[] __read_mostly = {
+	{
+		.hook = mtk_hnat_nf_conntrack,
+		.pf = NFPROTO_IPV4,
+		.hooknum = NF_INET_PRE_ROUTING,
+		.priority = NF_IP_PRI_MANGLE-1,
+	},
+	{
+		.hook = mtk_hnat_nf_conntrack,
+		.pf = NFPROTO_IPV6,
+		.hooknum = NF_INET_PRE_ROUTING,
+		.priority = NF_IP_PRI_MANGLE-1,
+	},
 	{
 		.hook = mtk_hnat_ipv4_nf_pre_routing,
 		.pf = NFPROTO_IPV4,

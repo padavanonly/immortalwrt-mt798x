@@ -884,7 +884,6 @@ struct mib_entry {
 struct hnat_accounting {
 	u64 bytes;
 	u64 packets;
-	u64 nfct; /* For retrieving nf_conn info */
 };
 
 enum mtk_hnat_version {
@@ -1240,6 +1239,13 @@ enum FoeIpAct {
 	 (IS_HQOS_DL_MODE && IS_LAN_GRP(dev)) ||	\
 	 (IS_PPPQ_MODE && (IS_PPPQ_PATH(dev, skb) ||	\
 			   qid >= MAX_PPPQ_PORT_NUM)))
+			   
+#define HNAT_GMAC_FP(mac_id)						\
+	((IS_GMAC1_MODE || mac_id == MTK_GMAC1_ID) ? NR_GMAC1_PORT :	\
+			  (mac_id == MTK_GMAC2_ID) ? NR_GMAC2_PORT :	\
+			  (mac_id == MTK_GMAC3_ID) ? NR_GMAC3_PORT :	\
+						    -EINVAL)
+
 
 extern const struct of_device_id of_hnat_match[];
 extern struct mtk_hnat *hnat_priv;

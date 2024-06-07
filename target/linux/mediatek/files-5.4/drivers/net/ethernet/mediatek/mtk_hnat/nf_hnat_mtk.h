@@ -128,7 +128,7 @@ struct hnat_desc {
 	(headroom_ppe2(h) ? 2 : (headroom_ppe1(h) ? 1 : 0))
 
 #define do_ext2ge_fast_try(dev, skb)						\
-	((skb_hnat_iface(skb) == FOE_MAGIC_EXT) && !is_from_extge(skb))
+	(IS_EXT(dev) && !is_from_extge(skb))
 #define set_from_extge(skb) (HNAT_SKB_CB2(skb)->magic = 0x78786688)
 #define clr_from_extge(skb) (HNAT_SKB_CB2(skb)->magic = 0x0)
 #define set_to_ppe(skb) (HNAT_SKB_CB2(skb)->magic = 0x78681415)

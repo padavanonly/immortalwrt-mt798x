@@ -26,21 +26,21 @@
  }
  
 +static struct hnat_desc {
-+	u32 entry : 14;
-+	
-+	u32 fill : 4;
-+	
++	u32 entry : 15;
++	u32 fill : 3;
 +	u32 crsn : 5;
-+	u32 sport : 4;
-+	u32 alg : 1;
-+	u32 iface : 8;
-+	u32 ppe : 1;
-+	u32 filled : 3;
-+	u32 magic_tag_protect : 16;
-+	u32 wdmaid : 8;
-+	u32 rxid : 2;
-+	u32 wcid : 10;
-+	u32 bssid : 6;
++	u32 resv1 : 9;
++	u32 resv2 : 32;
++	u32 resv3 : 32;
++	u32 resv4 : 32;
++	
++	
++
++
++	
++	
++
++	
 +} __packed;
 +#define HIT_BIND_KEEPALIVE_DUP_OLD_HDR 0x15
 +#define skb_hnat_reason(skb) (((struct hnat_desc *)(skb->head))->crsn)
@@ -120,21 +120,21 @@
  }
  
 +static struct hnat_desc {
-+	u32 entry : 14;
-+	
-+	u32 fill : 4;
-+	
++	u32 entry : 15;
++	u32 fill : 3;
 +	u32 crsn : 5;
-+	u32 sport : 4;
-+	u32 alg : 1;
-+	u32 iface : 8;
-+	u32 ppe : 1;
-+	u32 filled : 3;
-+	u32 magic_tag_protect : 16;
-+	u32 wdmaid : 8;
-+	u32 rxid : 2;
-+	u32 wcid : 10;
-+	u32 bssid : 6;
++	u32 resv1 : 9;
++	u32 resv2 : 32;
++	u32 resv3 : 32;
++	u32 resv4 : 32;
++	
++	
++
++
++	
++	
++
++	
 +} __packed;
 +#define HIT_BIND_KEEPALIVE_DUP_OLD_HDR 0x15
 +#define skb_hnat_reason(skb) (((struct hnat_desc *)(skb->head))->crsn)
