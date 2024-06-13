@@ -184,4 +184,28 @@
  		t = ip6t_get_target_c(e);
  		WARN_ON(!t->u.kernel.target);
  
+--- a/drivers/net/phy/sfp-bus.c	2024-06-12 21:54:22.988652000 +0800
++++ b/drivers/net/phy/sfp-bus.c	2024-06-13 13:39:23.555611593 +0800
+@@ -149,10 +149,6 @@
+ 	unsigned int br_min, br_nom, br_max;
+ 	__ETHTOOL_DECLARE_LINK_MODE_MASK(modes) = { 0, };
+ 
+-	phylink_set(modes, Autoneg);
+-	phylink_set(modes, Pause);
+-	phylink_set(modes, Asym_Pause);
+-
+ 	/* Decode the bitrate information to MBd */
+ 	br_min = br_nom = br_max = 0;
+ 	if (id->base.br_nominal) {
+@@ -275,6 +271,10 @@
+ 		if (br_nom && br_min <= 1300 && br_max >= 1200)
+ 			phylink_set(modes, 1000baseX_Full);
+ 	}
++	
++	phylink_set(modes, Autoneg);
++	phylink_set(modes, Pause);
++	phylink_set(modes, Asym_Pause);
+ 
+ 	if (bus->sfp_quirk && bus->sfp_quirk->modes)
+ 		bus->sfp_quirk->modes(id, modes);
 

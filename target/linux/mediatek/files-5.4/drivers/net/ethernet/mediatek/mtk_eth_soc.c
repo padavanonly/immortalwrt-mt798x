@@ -3718,9 +3718,9 @@ static void mtk_dma_free(struct mtk_eth *eth)
 		eth->phy_scratch_ring = 0;
 	}
 	mtk_tx_clean(eth);
-	mtk_rx_clean(eth, &eth->rx_ring[0],eth->soc->has_sram);
-	mtk_rx_clean(eth, &eth->rx_ring_qdma,0);
-
+	mtk_rx_clean(eth, &eth->rx_ring[0], soc->has_sram);
+	mtk_rx_clean(eth, &eth->rx_ring_qdma, 0);
+	
 	if (eth->hwlro) {
 		mtk_hwlro_rx_uninit(eth);
 
@@ -3732,7 +3732,7 @@ static void mtk_dma_free(struct mtk_eth *eth)
 		mtk_rss_uninit(eth);
 
 		for (i = 0; i < MTK_RX_RSS_NUM; i++)
-			mtk_rx_clean(eth, &eth->rx_ring[MTK_RSS_RING(i)], 1);
+			mtk_rx_clean(eth, &eth->rx_ring[MTK_RSS_RING(i)], soc->has_sram);
 	}
 
 	for (i = 0; i < DIV_ROUND_UP(soc->txrx.fq_dma_size, MTK_FQ_DMA_LENGTH); i++) {
