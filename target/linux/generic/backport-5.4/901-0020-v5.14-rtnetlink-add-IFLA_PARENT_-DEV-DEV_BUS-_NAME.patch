@@ -1,0 +1,90 @@
+From 8d4ebaa6f102ec09a03501f3f2f0d036772b1d8a Mon Sep 17 00:00:00 2001
+From: Kristian Evensen <kristian.evensen@gmail.com>
+Date: Mon, 2 Aug 2021 13:10:57 +0200
+Subject: [PATCH 7/9] rtnetlink: add IFLA_PARENT_[DEV|DEV_BUS]_NAME
+
+In some cases, for example in the upcoming WWAN framework changes,
+there's no natural "parent netdev", so sometimes dummy netdevs are
+created or similar. IFLA_PARENT_DEV_NAME is a new attribute intended to
+contain a device (sysfs, struct device) name that can be used instead
+when creating a new netdev, if the rtnetlink family implements it.
+
+As suggested by Parav Pandit, we also introduce IFLA_PARENT_DEV_BUS_NAME
+attribute in order to uniquely identify a device on the system (with
+bus/name pair).
+
+ip-link(8) support for the generic parent device attributes will help
+us avoid code duplication, so no other link type will require a custom
+code to handle the parent name attribute. E.g. the WWAN interface
+creation command will looks like this:
+
+$ ip link add wwan0-1 parent-dev wwan0 type wwan channel-id 1
+
+So, some future subsystem (or driver) FOO will have an interface
+creation command that looks like this:
+
+$ ip link add foo1-3 parent-dev foo1 type foo bar-id 3 baz-type Y
+
+Below is an example of dumping link info of a random device with these
+new attributes:
+
+$ ip --details link show wlp0s20f3
+  4: wlp0s20f3: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc noqueue
+     state UP mode DORMANT group default qlen 1000
+     ...
+     parent_bus pci parent_dev 0000:00:14.3
+
+Co-developed-by: Sergey Ryazanov <ryazanov.s.a@gmail.com>
+Signed-off-by: Sergey Ryazanov <ryazanov.s.a@gmail.com>
+Co-developed-by: Loic Poulain <loic.poulain@linaro.org>
+Signed-off-by: Loic Poulain <loic.poulain@linaro.org>
+Suggested-by: Sergey Ryazanov <ryazanov.s.a@gmail.com>
+Signed-off-by: Johannes Berg <johannes.berg@intel.com>
+Signed-off-by: David S. Miller <davem@davemloft.net>
+---
+ include/uapi/linux/if_link.h |  7 +++++++
+ net/core/rtnetlink.c         | 10 ++++++++++
+ 2 files changed, 17 insertions(+)
+
+diff --git a/include/uapi/linux/if_link.h b/include/uapi/linux/if_link.h
+index 4a8c02cafa9a..f44585950616 100644
+--- a/include/uapi/linux/if_link.h
++++ b/include/uapi/linux/if_link.h
+@@ -167,6 +167,13 @@ enum {
+ 	IFLA_NEW_IFINDEX,
+ 	IFLA_MIN_MTU,
+ 	IFLA_MAX_MTU,
++
++	/* device (sysfs) name as parent, used instead
++	 * of IFLA_LINK where there's no parent netdev
++	 */
++	IFLA_PARENT_DEV_NAME,
++	IFLA_PARENT_DEV_BUS_NAME,
++
+ 	__IFLA_MAX
+ };
+ 
+diff --git a/net/core/rtnetlink.c b/net/core/rtnetlink.c
+index 73c09b5864d7..8f6739b837d9 100644
+--- a/net/core/rtnetlink.c
++++ b/net/core/rtnetlink.c
+@@ -1697,6 +1697,16 @@ static int rtnl_fill_ifinfo(struct sk_buff *skb,
+ 		goto nla_put_failure_rcu;
+ 	rcu_read_unlock();
+ 
++	if (dev->dev.parent &&
++	    nla_put_string(skb, IFLA_PARENT_DEV_NAME,
++			   dev_name(dev->dev.parent)))
++		goto nla_put_failure;
++
++	if (dev->dev.parent && dev->dev.parent->bus &&
++	    nla_put_string(skb, IFLA_PARENT_DEV_BUS_NAME,
++			   dev->dev.parent->bus->name))
++		goto nla_put_failure;
++
+ 	nlmsg_end(skb, nlh);
+ 	return 0;
+ 
+-- 
+2.25.1
+

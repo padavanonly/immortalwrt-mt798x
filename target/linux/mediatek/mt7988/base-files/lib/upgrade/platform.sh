@@ -6,11 +6,14 @@ platform_do_upgrade() {
 
 	case "$board" in
 	*snand*)
-		ubi_do_upgrade "$1"
+		nand_do_upgrade "$1"
 		;;
 	*emmc*)
-		mtk_mmc_do_upgrade "$1"
+		CI_KERNPART="kernel"
+		CI_ROOTPART="rootfs"
+		emmc_do_upgrade "$1"
 		;;
+
 	*)
 		default_do_upgrade "$1"
 		;;

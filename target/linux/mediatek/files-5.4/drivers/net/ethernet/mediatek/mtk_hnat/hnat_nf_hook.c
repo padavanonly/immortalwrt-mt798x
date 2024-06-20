@@ -31,7 +31,11 @@
 
 #include "../mtk_eth_soc.h"
 #include "../mtk_eth_reset.h"
+#include <linux/ppp_defs.h>
+#include <linux/ppp_channel.h>
 
+#include <linux/if_pppox.h>
+#include <linux/if_ether.h>
 #define do_ge2ext_fast(dev, skb)                                               \
 	((IS_LAN_GRP(dev) || IS_WAN(dev) || IS_PPD(dev)) && \
 	 skb_hnat_is_hashed(skb) && \
@@ -280,11 +284,12 @@ int nf_hnat_netdevice_event(struct notifier_block *unused, unsigned long event,
 
 	switch (event) {
 	case NETDEV_UP:
-	
+		
 		if (!hnat_priv->guest_en && dev->name) {
 			if (!strcmp(dev->name, "ra1") || !strcmp(dev->name, "rax1"))
 				break;
 		}
+		
 		gmac_ppe_fwd_enable(dev);
 
 		extif_set_dev(dev,1);
@@ -3251,4 +3256,3 @@ int mtk_hqos_ptype_cb(struct sk_buff *skb, struct net_device *dev,
 
 	return 0;
 }
-

@@ -80,7 +80,6 @@
 			partition@0 {
 				label = "BL2";
 				reg = <0x00000 0x0100000>;
-				read-only;
 			};
 
 			partition@100000 {
@@ -150,7 +149,7 @@
 };
 
 &fan {
-	pwms = <&pwm 0 50000 0>;
+	pwms = <&pwm 0 50000 >;
 	status = "okay";
 };
 
@@ -225,6 +224,7 @@
 		};
 	};
 };
+
 
 &i2c1 {
 	pinctrl-names = "default";
@@ -589,7 +589,7 @@
 	mtketh-lan2 = "eth1";
 	mtketh-max-gmac = <3>;
 	mtketh-ppe-num = <3>;
-	ext-devices-prefix = "usb", "wwan","rmnet";
+	ext-devices-prefix = "usb", "wwan","rmnet","eth3","eth4","eth5";
 	status = "okay";
 };
 

@@ -88,7 +88,7 @@ Signed-off-by: Felix Fietkau <nbd@nbd.name>
 +	if (sock_flag(sk, SOCK_DEAD) ||
 +	    !(sk->sk_state & PPPOX_CONNECTED) || !dev)
 +		return -ENODEV;
-+
++	
 +	path->dev = po->pppoe_dev;
 +	path->flags |= FLOW_OFFLOAD_PATH_PPPOE;
 +	memcpy(path->eth_src, po->pppoe_dev->dev_addr, ETH_ALEN);
