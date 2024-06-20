@@ -1345,3 +1345,68 @@ define KernelPackage/sfc-falcon/description
 endef
 
 $(eval $(call KernelPackage,sfc-falcon))
+
+define KernelPackage/mhi-net
+  SUBMENU:=$(NETWORK_DEVICES_MENU)
+  TITLE:=MHI Network Device
+  DEPENDS:=@PCI_SUPPORT +kmod-mhi-bus
+  KCONFIG:=CONFIG_MHI_NET
+  FILES:=$(LINUX_DIR)/drivers/net/mhi_net.ko
+  AUTOLOAD:=$(call AutoProbe,mhi_net)
+endef
+
+define KernelPackage/mhi-net/description
+  Driver for MHI network interface
+endef
+
+$(eval $(call KernelPackage,mhi-net))
+
+define KernelPackage/wwan
+  SUBMENU:=$(NETWORK_DEVICES_MENU)
+  TITLE:=WWAN Driver Core
+  DEPENDS:=@PCI_SUPPORT
+  KCONFIG:=CONFIG_WWAN
+  FILES:=$(LINUX_DIR)/drivers/net/wwan/wwan.ko
+  AUTOLOAD:=$(call AutoProbe,wwan)
+endef
+define KernelPackage/wwan/description
+  The WWAN core driver provides a common framework for WWAN drivers.
+endef
+
+$(eval $(call KernelPackage,wwan))
+
+define KernelPackage/mhi-wwan-ctrl
+  SUBMENU:=$(NETWORK_DEVICES_MENU)
+  TITLE:=MHI WWAN control driver for QCOM-based PCIe modems
+  DEPENDS:=@PCI_SUPPORT +kmod-wwan +kmod-mhi-net
+  KCONFIG:=CONFIG_MHI_WWAN_CTRL
+  FILES:=$(LINUX_DIR)/drivers/net/wwan/mhi_wwan_ctrl.ko
+  AUTOLOAD:=$(call AutoProbe,mhi_wwan_ctrl)
+endef
+
+define KernelPackage/mhi-wwan-ctrl/description
+  MHI WWAN CTRL allows QCOM-based PCIe modems to expose different modem
+  control protocols/ports to userspace, including AT, MBIM, QMI, DIAG
+  and FIREHOSE. These protocols can be accessed directly from userspace
+  (e.g. AT commands) or via libraries/tools (e.g. libmbim, libqmi,
+  libqcdm...).
+endef
+$(eval $(call KernelPackage,mhi-wwan-ctrl))
+
+define KernelPackage/mhi-wwan-mbim
+  SUBMENU:=$(NETWORK_DEVICES_MENU)
+  TITLE:=MHI WWAN MBIM network driver for QCOM-based PCIe modems
+  DEPENDS:=@PCI_SUPPORT +kmod-wwan +kmod-mhi-net
+  KCONFIG:=CONFIG_MHI_WWAN_MBIM
+  FILES:=$(LINUX_DIR)/drivers/net/wwan/mhi_wwan_mbim.ko
+  AUTOLOAD:=$(call AutoProbe,mhi_wwan_mbim)
+endef
+
+define KernelPackage/mhi-wwan-mbim/description
+  MHI WWAN MBIM is a WWAN network driver for QCOM-based PCIe modems.
+  It implements MBIM over MHI, for IP data aggregation and muxing.
+  A default wwan0 network interface is created for MBIM data session
+  ID 0. Additional links can be created via wwan rtnetlink type.
+endef
+
+$(eval $(call KernelPackage,mhi-wwan-mbim))

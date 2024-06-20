@@ -1255,3 +1255,20 @@ define KernelPackage/f71808e-wdt/description
 endef
 
 $(eval $(call KernelPackage,f71808e-wdt))
+
+define KernelPackage/mhi-bus
+  SUBMENU:=$(OTHER_MENU)
+  TITLE:=Modem Host Interface (MHI) bus and PCI driver
+  KCONFIG:=CONFIG_MHI_BUS \
+           CONFIG_MHI_BUS_PCI_GENERIC \
+           CONFIG_MHI_BUS_DEBUG=y
+  FILES:=$(LINUX_DIR)/drivers/bus/mhi/mhi_pci_generic.ko \
+         $(LINUX_DIR)/drivers/bus/mhi/core/mhi.ko
+  AUTOLOAD:=$(call AutoProbe,mhi mhi_pci_generic)
+endef
+
+define KernelPackage/mhi-bus/description
+  Kernel modules for the Qualcoom MHI bus.
+endef
+
+$(eval $(call KernelPackage,mhi-bus))
