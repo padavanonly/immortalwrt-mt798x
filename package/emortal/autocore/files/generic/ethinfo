@@ -7,7 +7,57 @@ local jsonc = require "luci.jsonc"
 local eth_info = {}
 local ifname, stat
 for ifname, stat in pairs(util.ubus("network.device", "status")) do
-        if ifname:match("^(eth%d+)$") == ifname then
+        if ifname:match("^(eth1)$") == ifname then
+                local status, speed, duplex
+
+                status = stat.carrier and "yes" or "no"
+
+                if not stat.carrier or not stat.speed or stat.speed:sub(1, 1) == "-" then
+                        speed = "-"
+                else
+                        speed = stat.speed:sub(1, -2) .. "Mb/s"
+                end
+
+                if speed == '-' then
+			duplex = "-"
+		elseif stat.speed:sub(-1) == "F" then
+                        duplex = "Full"
+                else
+                        duplex = "Half"
+                end
+
+		eth_info[#eth_info+1] = { name = ifname, status = status,
+					speed = speed, duplex = duplex }
+        end
+end
+
+for ifname, stat in pairs(util.ubus("network.device", "status")) do
+        if ifname:match("^(eth2)$") == ifname then
+                local status, speed, duplex
+
+                status = stat.carrier and "yes" or "no"
+
+                if not stat.carrier or not stat.speed or stat.speed:sub(1, 1) == "-" then
+                        speed = "-"
+                else
+                        speed = stat.speed:sub(1, -2) .. "Mb/s"
+                end
+
+                if speed == '-' then
+			duplex = "-"
+		elseif stat.speed:sub(-1) == "F" then
+                        duplex = "Full"
+                else
+                        duplex = "Half"
+                end
+
+		eth_info[#eth_info+1] = { name = ifname, status = status,
+					speed = speed, duplex = duplex }
+        end
+end
+
+for ifname, stat in pairs(util.ubus("network.device", "status")) do
+        if ifname:match("^(lan%d+)$") == ifname then
                 local status, speed, duplex
 
                 status = stat.carrier and "yes" or "no"
