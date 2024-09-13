@@ -19,7 +19,7 @@
 #include <linux/mod_devicetable.h>
 #include "hnat_mcast.h"
 #include "nf_hnat_mtk.h"
-
+#include <net/dsa.h>
 /*--------------------------------------------------------------------------*/
 /* Register Offset*/
 /*--------------------------------------------------------------------------*/
@@ -1153,13 +1153,16 @@ enum FoeIpAct {
 #define LAN_DEV_NAME hnat_priv->lan
 #define LAN2_DEV_NAME hnat_priv->lan2
 #define IS_WAN(dev)                                                            \
-	((!strncmp((dev)->name, hnat_priv->wan, strlen(hnat_priv->wan))) || ((!strncmp((dev)->name, "macvlan", 7)) && \
-	(hnat_priv->macvlan_support)))
+	((!strncmp((dev)->name, hnat_priv->wan, strlen(hnat_priv->wan))) ||		\
+	 IS_BOND(dev))
 #define IS_LAN_GRP(dev) (IS_LAN(dev) | IS_LAN2(dev))
-#define IS_LAN(dev) (!strncmp(dev->name, LAN_DEV_NAME, strlen(LAN_DEV_NAME)))
+#define IS_LAN(dev)								\
+	(!strncmp(dev->name, LAN_DEV_NAME, strlen(LAN_DEV_NAME)) ||		\
+	 IS_BOND(dev))
 #define IS_LAN2(dev) (!strncmp(dev->name, LAN2_DEV_NAME,			\
 		      strlen(LAN2_DEV_NAME)))
 #define IS_BR(dev) (!strncmp(dev->name, "br", 2))
+#define IS_BOND(dev) (!strncmp(dev->name, "bond", 4))
 #define IS_WHNAT(dev)								\
 	((hnat_priv->data->whnat &&						\
 	 (get_wifi_hook_if_index_from_dev(dev) != 0)) ? 1 : 0)
@@ -1262,30 +1265,20 @@ static inline int is_hnat_pre_filled(struct foe_entry *entry)
 	return !!(udf & UDF_HNAT_PRE_FILLED);
 }
 
-#if defined(CONFIG_NET_DSA_MT7530)
-u32 hnat_dsa_fill_stag(const struct net_device *netdev,
+int hnat_dsa_fill_stag(const struct net_device *netdev,
 		       struct foe_entry *entry,
 		       struct flow_offload_hw_path *hw_path,
 		       u16 eth_proto, int mape);
-
+int hnat_dsa_get_port(struct net_device **dev);
 static inline bool hnat_dsa_is_enable(struct mtk_hnat *priv)
 {
+#if defined(CONFIG_NET_DSA)
 	return (priv->wan_dsa_port != NONE_DSA_PORT);
-}
 #else
-static inline u32 hnat_dsa_fill_stag(const struct net_device *netdev,
-				     struct foe_entry *entry,
-				     struct flow_offload_hw_path *hw_path,
-				     u16 eth_proto, int mape)
-{
-	return 0;
+	return false;
+#endif
 }
 
-static inline bool hnat_dsa_is_enable(struct mtk_hnat *priv)
-{
-	return false;
-}
-#endif
 
 void hnat_deinit_debugfs(struct mtk_hnat *h);
 int hnat_init_debugfs(struct mtk_hnat *h);

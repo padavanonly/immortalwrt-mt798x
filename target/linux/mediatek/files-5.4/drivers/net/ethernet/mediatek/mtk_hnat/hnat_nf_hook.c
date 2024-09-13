@@ -222,6 +222,62 @@ int ext_if_add(struct extdev_entry *ext_entry)
 	return len;
 }
 
+static void foe_clear_ethdev_bind_entries(struct net_device *dev)
+{
+	struct net_device *master_dev = dev;
+	const struct dsa_port *dp;
+	struct foe_entry *entry;
+	struct mtk_mac *mac;
+	bool match_dev = false;
+	int port_id, gmac;
+	u32 i, hash_index;
+	u32 dsa_tag;
+	u32 total = 0;
+	/* Get the master device if the device is slave device */
+	port_id = hnat_dsa_get_port(&master_dev);
+	mac = netdev_priv(master_dev);
+	gmac = HNAT_GMAC_FP(mac->id);
+	if (gmac < 0)
+		return;
+	if (port_id >= 0) {
+		dp = dsa_port_from_netdev(dev);
+		if (IS_ERR(dp))
+			return;
+		if (0)
+			dsa_tag = port_id + BIT(11);
+		else
+			dsa_tag = BIT(port_id);
+	}
+	for (i = 0; i < CFG_PPE_NUM; i++) {
+		for (hash_index = 0; hash_index < hnat_priv->foe_etry_num; hash_index++) {
+			entry = hnat_priv->foe_table_cpu[i] + hash_index;
+			if (!entry_hnat_is_bound(entry))
+				continue;
+			match_dev = (IS_IPV4_GRP(entry)) ? entry->ipv4_hnapt.iblk2.dp == gmac :
+							   entry->ipv6_5t_route.iblk2.dp == gmac;
+			if (match_dev && port_id >= 0) {
+				if (0) {
+					match_dev = (IS_IPV4_GRP(entry)) ?
+						entry->ipv4_hnapt.vlan1 == dsa_tag :
+						entry->ipv6_5t_route.vlan1 == dsa_tag;
+				} else {
+					match_dev = (IS_IPV4_GRP(entry)) ?
+						!!(entry->ipv4_hnapt.etype & dsa_tag) :
+						!!(entry->ipv6_5t_route.etype & dsa_tag);
+				}
+			}
+			if (match_dev) {
+				entry->bfib1.state = INVALID;
+				entry->bfib1.time_stamp =
+					readl((hnat_priv->fe_base + 0x0010)) & 0xFF;
+				total++;
+			}
+		}
+	}
+	/* clear HWNAT cache */
+	if (total > 0)
+		hnat_cache_ebl(1);
+}
 int ext_if_del(struct extdev_entry *ext_entry)
 {
 	int i, j;
@@ -295,6 +351,17 @@ int nf_hnat_netdevice_event(struct notifier_block *unused, unsigned long event,
 		extif_set_dev(dev,1);
 
 		break;
+
+	case NETDEV_CHANGE:
+		/* Clear PPE entries if the slave of bond device physical link down */
+		if (!netif_is_bond_slave(dev) ||
+		    (!IS_LAN_GRP(dev) && !IS_WAN(dev)))
+			break;
+		if (netif_carrier_ok(dev))
+			break;
+		foe_clear_ethdev_bind_entries(dev);
+		break;
+		
 	case NETDEV_GOING_DOWN:
 		if (!get_wifi_hook_if_index_from_dev(dev))
 			extif_put_dev(dev);
@@ -502,7 +569,7 @@ unsigned int do_hnat_ext_to_ge2(struct sk_buff *skb, const char *func)
 				return -1;
 		}
 
-		if (IS_BOND_MODE &&
+		if (IS_BOND(dev) &&
 		    (((hnat_priv->data->version == MTK_HNAT_V2 ||
 		       hnat_priv->data->version == MTK_HNAT_V3) &&
 				(skb_hnat_entry(skb) != 0x7fff)) ||
@@ -1345,7 +1412,11 @@ static unsigned int skb_to_hnat_info(struct sk_buff *skb,
 				     struct foe_entry *foe,
 				     struct flow_offload_hw_path *hw_path)
 {
+	struct net_device *master_dev = (struct net_device *)dev;
+	struct net_device *slave_dev[10];
+	struct list_head *iter;
 	struct foe_entry entry = { 0 };
+	struct mtk_mac *mac;
 	int whnat = IS_WHNAT(dev);
 	struct ethhdr *eth;
 	struct iphdr *iph;
@@ -1357,11 +1428,11 @@ static unsigned int skb_to_hnat_info(struct sk_buff *skb,
 	int gmac = NR_DISCARD;
 	int udp = 0;
 	u32 qid = 0;
-	u32 port_id = 0;
+	int port_id = 0;
 	u32 payload_len = 0;
 	int mape = 0;
 	u8  dscp = 0;
-	struct mtk_mac *mac = netdev_priv(dev);
+	int i = 0;
 
 	ct = nf_ct_get(skb, &ctinfo);
 
@@ -1829,33 +1900,40 @@ static unsigned int skb_to_hnat_info(struct sk_buff *skb,
 	/* Fill Info Blk*/
 	entry = ppe_fill_info_blk(eth, entry, hw_path);
 
-	if (IS_LAN(dev)) {
-		if (IS_DSA_LAN(dev))
-			port_id = hnat_dsa_fill_stag(dev, &entry, hw_path,
-						     ntohs(eth->h_proto),
-						     mape);
-		if (IS_BOND_MODE)
-			gmac = ((skb_hnat_entry(skb) >> 1) % hnat_priv->gmac_num) ?
-				 NR_GMAC2_PORT : NR_GMAC1_PORT;
-		else
-			gmac = NR_GMAC1_PORT;
-	} else if (IS_LAN2(dev)) {
-		gmac = (mac->id == MTK_GMAC2_ID) ? NR_GMAC2_PORT : NR_GMAC3_PORT;
-	} else if (IS_WAN(dev)) {
-		if (IS_DSA_WAN(dev))
-			port_id = hnat_dsa_fill_stag(dev,&entry, hw_path,
-						     ntohs(eth->h_proto),
-						     mape);
-		if (mape_toggle && mape == 1) {
+	if (IS_LAN_GRP(dev) || IS_WAN(dev)) { /* Forward to GMAC Ports */
+		if (IS_BOND(dev)) {
+			/* Retrieve subordinate devices that are connected to the Bond device */
+			netdev_for_each_lower_dev(master_dev, slave_dev[i], iter) {
+				/* Check the link status of the slave device */
+				if (!(slave_dev[i]->flags & IFF_UP) ||
+				    !netif_carrier_ok(slave_dev[i]))
+					continue;
+				i++;
+				if (i >= ARRAY_SIZE(slave_dev))
+					break;
+			}
+			if (i > 0) {
+				i = (skb_hnat_entry(skb) >> 1) % i;
+				if (i >= 0 && i < ARRAY_SIZE(slave_dev)) {
+					/* Choose a subordinate device by hash index */
+					dev = slave_dev[i];
+					master_dev = slave_dev[i];
+				}
+			}
+		}
+		port_id = hnat_dsa_get_port(&master_dev);
+		if (port_id >= 0) {
+			if (hnat_dsa_fill_stag(dev, &entry, hw_path,
+					       ntohs(eth->h_proto), mape) < 0)
+				return 0;
+		}
+		mac = netdev_priv(master_dev);
+		gmac = HNAT_GMAC_FP(mac->id);
+		if (IS_WAN(dev) && mape_toggle && mape == 1) {
 			gmac = NR_PDMA_PORT;
 			/* Set act_dp = wan_dev */
 			entry.ipv4_hnapt.act_dp &= ~UDF_PINGPONG_IFIDX;
 			entry.ipv4_hnapt.act_dp |= dev->ifindex & UDF_PINGPONG_IFIDX;
-		} else {
-			if (IS_GMAC1_MODE)
-				gmac = NR_GMAC1_PORT;
-			else
-				gmac = (mac->id == MTK_GMAC2_ID) ? NR_GMAC2_PORT : NR_GMAC3_PORT;
 		}
 	} else if (IS_EXT(dev) && (FROM_GE_PPD(skb) || FROM_GE_LAN(skb) ||
 		   FROM_GE_WAN(skb) || FROM_GE_VIRTUAL(skb) || FROM_WED(skb) || FROM_EXT(skb))) {
@@ -1883,13 +1961,15 @@ static unsigned int skb_to_hnat_info(struct sk_buff *skb,
 			entry.ipv6_5t_route.act_dp |= dev->ifindex & UDF_PINGPONG_IFIDX;
 		}
 	} else {
-		printk_ratelimited(KERN_WARNING
-					"Unknown case of dp, iif=%x --> %s\n",
-					skb_hnat_iface(skb), dev->name);
-
-		return 0;
+		gmac = -EINVAL;
 	}
 
+	if (gmac < 0) {
+		printk_ratelimited(KERN_WARNING
+				   "Unknown case of dp, iif=%x --> %s\n",
+				   skb_hnat_iface(skb), dev->name);
+ 		return 0;
+ 	}
 	if (IS_HQOS_MODE || (skb->mark & MTK_QDMA_TX_MASK) >= MAX_PPPQ_PORT_NUM)
 		qid = skb->mark & (MTK_QDMA_TX_MASK);
 	else if (IS_PPPQ_MODE && IS_PPPQ_PATH(dev, skb))

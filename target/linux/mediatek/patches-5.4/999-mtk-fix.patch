@@ -1,3 +1,47 @@
+--- a/drivers/net/macvlan.c	2023-08-30 22:27:28.000000000 +0800
++++ b/drivers/net/macvlan.c	2024-09-12 19:15:11.653886551 +0800
+@@ -33,6 +33,11 @@
+ #include <linux/netpoll.h>
+ #include <linux/phy.h>
+ 
++#if IS_ENABLED(CONFIG_NF_FLOW_TABLE)
++#include <linux/netfilter.h>
++#include <net/netfilter/nf_flow_table.h>
++#endif
++
+ #define MACVLAN_HASH_BITS	8
+ #define MACVLAN_HASH_SIZE	(1<<MACVLAN_HASH_BITS)
+ #define MACVLAN_BC_QUEUE_LEN	1000
+@@ -1126,6 +1131,19 @@
+ 	return vlan->lowerdev->ifindex;
+ }
+ 
++#if IS_ENABLED(CONFIG_NF_FLOW_TABLE)
++static int macvlan_dev_flow_offload_check(struct flow_offload_hw_path *path)
++{
++	struct net_device *dev = path->dev;
++	struct macvlan_dev *vlan = netdev_priv(dev);
++	path->dev = vlan->lowerdev;
++	
++	if (path->dev->netdev_ops->ndo_flow_offload_check)
++		return path->dev->netdev_ops->ndo_flow_offload_check(path);
++	return 0;
++}
++#endif /* CONFIG_NF_FLOW_TABLE */
++
+ static const struct ethtool_ops macvlan_ethtool_ops = {
+ 	.get_link		= ethtool_op_get_link,
+ 	.get_link_ksettings	= macvlan_ethtool_get_link_ksettings,
+@@ -1160,6 +1178,9 @@
+ 	.ndo_get_iflink		= macvlan_dev_get_iflink,
+ 	.ndo_features_check	= passthru_features_check,
+ 	.ndo_change_proto_down  = dev_change_proto_down_generic,
++#if IS_ENABLED(CONFIG_NF_FLOW_TABLE)
++	.ndo_flow_offload_check = macvlan_dev_flow_offload_check,
++#endif
+ };
+ 
+ void macvlan_common_setup(struct net_device *dev)
 --- a/include/net/netfilter/nf_conntrack_acct.h	2024-01-04 22:35:10.790631711 +0800
 +++ b/include/net/netfilter/nf_conntrack_acct.h	2024-01-06 00:57:34.678787219 +0800
 @@ -14,6 +14,8 @@
