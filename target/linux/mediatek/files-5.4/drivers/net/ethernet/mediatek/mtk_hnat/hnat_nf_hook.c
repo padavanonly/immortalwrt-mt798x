@@ -562,7 +562,9 @@ unsigned int do_hnat_ext_to_ge2(struct sk_buff *skb, const char *func)
 		skb->dev = dev;
 		skb->vlan_proto = 0;
 		skb->vlan_tci = 0;
+		if (skb_vlan_tag_present(skb)){
 		__vlan_hwaccel_clear_tag(skb);
+		}
 		if (ntohs(eth->h_proto) == ETH_P_8021Q) {
 			skb = skb_vlan_untag(skb);
 			if (unlikely(!skb))
