@@ -1413,8 +1413,6 @@ static unsigned int skb_to_hnat_info(struct sk_buff *skb,
 				     struct flow_offload_hw_path *hw_path)
 {
 	struct net_device *master_dev = (struct net_device *)dev;
-	struct net_device *slave_dev[10];
-	struct list_head *iter;
 	struct foe_entry entry = { 0 };
 	struct mtk_mac *mac;
 	int whnat = IS_WHNAT(dev);
@@ -1432,7 +1430,7 @@ static unsigned int skb_to_hnat_info(struct sk_buff *skb,
 	u32 payload_len = 0;
 	int mape = 0;
 	u8  dscp = 0;
-	int i = 0;
+
 
 	ct = nf_ct_get(skb, &ctinfo);
 
@@ -1901,26 +1899,6 @@ static unsigned int skb_to_hnat_info(struct sk_buff *skb,
 	entry = ppe_fill_info_blk(eth, entry, hw_path);
 
 	if (IS_LAN_GRP(dev) || IS_WAN(dev)) { /* Forward to GMAC Ports */
-		if (IS_BOND(dev)) {
-			/* Retrieve subordinate devices that are connected to the Bond device */
-			netdev_for_each_lower_dev(master_dev, slave_dev[i], iter) {
-				/* Check the link status of the slave device */
-				if (!(slave_dev[i]->flags & IFF_UP) ||
-				    !netif_carrier_ok(slave_dev[i]))
-					continue;
-				i++;
-				if (i >= ARRAY_SIZE(slave_dev))
-					break;
-			}
-			if (i > 0) {
-				i = (skb_hnat_entry(skb) >> 1) % i;
-				if (i >= 0 && i < ARRAY_SIZE(slave_dev)) {
-					/* Choose a subordinate device by hash index */
-					dev = slave_dev[i];
-					master_dev = slave_dev[i];
-				}
-			}
-		}
 		port_id = hnat_dsa_get_port(&master_dev);
 		if (port_id >= 0) {
 			if (hnat_dsa_fill_stag(dev, &entry, hw_path,
@@ -2878,7 +2856,8 @@ static unsigned int mtk_hnat_nf_post_routing(
 {
 	struct foe_entry *entry;
 	struct flow_offload_hw_path hw_path = { .dev = (struct net_device*)out,
-						.virt_dev = (struct net_device*)out };
+						.virt_dev = (struct net_device*)out,
+						.skb_hash = skb_hnat_entry(skb) };
 	const struct net_device *arp_dev = out;
 
 	if (xlat_toggle && !mtk_464xlat_post_process(skb, out))
