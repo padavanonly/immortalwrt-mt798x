@@ -1,6 +1,18 @@
 --- a/drivers/net/bonding/bond_main.c	2024-09-13 16:35:08.772364500 +0800
 +++ b/drivers/net/bonding/bond_main.c	2024-09-14 11:18:53.735860267 +0800
-@@ -4370,6 +4370,35 @@
+@@ -80,7 +80,10 @@
+ #include <net/bonding.h>
+ #include <net/bond_3ad.h>
+ #include <net/bond_alb.h>
+-
++#if IS_ENABLED(CONFIG_NF_FLOW_TABLE)
++#include <linux/netfilter.h>
++#include <net/netfilter/nf_flow_table.h>
++#endif
+ #include "bonding_priv.h"
+ 
+ /*---------------------------- Module parameters ----------------------------*/
+@@ -4370,6 +4373,35 @@
  		 BOND_ABI_VERSION);
  }
  
@@ -36,7 +48,7 @@
  static const struct ethtool_ops bond_ethtool_ops = {
  	.get_drvinfo		= bond_ethtool_get_drvinfo,
  	.get_link		= ethtool_op_get_link,
-@@ -4401,6 +4430,9 @@
+@@ -4401,6 +4433,9 @@
  	.ndo_del_slave		= bond_release,
  	.ndo_fix_features	= bond_fix_features,
  	.ndo_features_check	= passthru_features_check,
@@ -46,7 +58,6 @@
  };
  
  static const struct device_type bond_type = {
-
 --- a/include/net/netfilter/nf_flow_table.h	2024-09-13 16:35:08.862364500 +0800
 +++ b/include/net/netfilter/nf_flow_table.h	2024-09-14 10:58:23.716107006 +0800
 @@ -109,6 +109,7 @@
