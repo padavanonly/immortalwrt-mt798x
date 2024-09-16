@@ -527,7 +527,7 @@ unsigned int do_hnat_ext_to_ge(struct sk_buff *skb, const struct net_device *in,
 		}
 
 		/*set where we come from*/
-		__vlan_put_tag(skb, htons(ETH_P_8021Q), VLAN_CFI_MASK | (in->ifindex & VLAN_VID_MASK));
+		__vlan_hwaccel_put_tag(skb, htons(ETH_P_8021Q), VLAN_CFI_MASK | (in->ifindex & VLAN_VID_MASK));
 		trace_printk(
 			"%s: vlan_prot=0x%x, vlan_tci=%x, in->name=%s, skb->dev->name=%s\n",
 			__func__, ntohs(skb->vlan_proto), skb->vlan_tci,
@@ -804,7 +804,7 @@ unsigned int do_hnat_mape_w2l_fast(struct sk_buff *skb, const struct net_device 
 		eth->h_proto = htons(ETH_P_IP);
 		set_to_ppe(skb);
 
-		__vlan_put_tag(skb, htons(ETH_P_8021Q), VLAN_CFI_MASK | (in->ifindex & VLAN_VID_MASK));
+		__vlan_hwaccel_put_tag(skb, htons(ETH_P_8021Q), VLAN_CFI_MASK | (in->ifindex & VLAN_VID_MASK));
 		if (!hnat_priv->g_ppdev)
 			hnat_priv->g_ppdev = dev_get_by_name(&init_net, hnat_priv->ppd);
 
