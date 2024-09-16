@@ -2398,7 +2398,7 @@ static int mtk_poll_rx(struct napi_struct *napi, int budget,
 				mac = (trxd.rxd4 & RX_DMA_SPECIAL_TAG) ?
 				      0 : RX_DMA_GET_SPORT(trxd.rxd4) - 1;
 		}
-		if (mac == 4) mac = 0;
+		if (mac == 4) mac = 1;
 		if (unlikely(mac < 0 || mac >= MTK_MAC_COUNT ||
 			     !eth->netdev[mac]))
 			goto release_desc;
