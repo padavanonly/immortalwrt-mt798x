@@ -618,6 +618,11 @@
 #define RX_DMA_SPORT_MASK       0x7
 #define RX_DMA_SPORT_MASK_V2    0xf
 
+#define RX_DMA_CRSN_SHIFT_V2      18
+#define RX_DMA_CRSN_MASK_V2       0x1f
+#define RX_DMA_CRSN_SHIFT      14
+#define RX_DMA_CRSN_MASK       0x1f
+
 /* QDMA descriptor txd4 */
 #define TX_DMA_CHKSUM		(0x7 << 29)
 #define TX_DMA_TSO		BIT(28)
@@ -675,6 +680,9 @@
 
 #define RX_DMA_GET_SPORT(_x) 	(((_x) >> RX_DMA_SPORT_SHIFT) & RX_DMA_SPORT_MASK)
 #define RX_DMA_GET_SPORT_V2(_x) (((_x) >> RX_DMA_SPORT_SHIFT_V2) & RX_DMA_SPORT_MASK_V2)
+#define RX_DMA_GET_CRSN(_x) 	(((_x) >> RX_DMA_CRSN_SHIFT) & RX_DMA_CRSN_MASK)
+#define RX_DMA_GET_CRSN_V2(_x) 	(((_x) >> RX_DMA_CRSN_SHIFT_V2) & RX_DMA_CRSN_MASK_V2)
+
 
 /* PDMA V2 descriptor txd4 */
 #define TX_DMA_LS1_V2	BIT(30)
