@@ -3705,10 +3705,8 @@ static void mtk_dma_free(struct mtk_eth *eth)
 	const struct mtk_soc_data *soc = eth->soc;
 	int i, j, txqs;
 
-	if (MTK_HAS_CAPS(eth->soc->caps, MTK_QDMA))
-		txqs = MTK_QDMA_TX_NUM;
-	else
-		txqs = MTK_PDMA_TX_NUM;
+	txqs = MTK_QDMA_TX_NUM;
+	
 
 	for (i = 0; i < MTK_MAC_COUNT; i++) {
 		if (!eth->netdev[i])
