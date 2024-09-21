@@ -3703,11 +3703,20 @@ static int mtk_dma_init(struct mtk_eth *eth)
 static void mtk_dma_free(struct mtk_eth *eth)
 {
 	const struct mtk_soc_data *soc = eth->soc;
-	int i;
+	int i, j, txqs;
 
-	for (i = 0; i < MTK_MAC_COUNT; i++)
-		if (eth->netdev[i])
-			netdev_reset_queue(eth->netdev[i]);
+	if (MTK_HAS_CAPS(eth->soc->caps, MTK_QDMA))
+		txqs = MTK_QDMA_TX_NUM;
+	else
+		txqs = MTK_PDMA_TX_NUM;
+
+	for (i = 0; i < MTK_MAC_COUNT; i++) {
+		if (!eth->netdev[i])
+			continue;
+
+		for (j = 0; j < txqs; j++)
+			netdev_tx_reset_queue(netdev_get_tx_queue(eth->netdev[i], j));
+	}
 	if ( !eth->soc->has_sram && eth->scratch_ring) {
 		dma_free_coherent(eth->dma_dev,
 				  soc->txrx.fq_dma_size * soc->txrx.txd_size,
