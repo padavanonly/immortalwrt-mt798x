@@ -4394,10 +4394,14 @@ static int mtk_hw_init(struct mtk_eth *eth, u32 type)
 
 	if (MTK_HAS_CAPS(eth->soc->caps, MTK_NETSYS_V3)) {
 		/* PSE dummy page mechanism */
-		if (eth->soc->caps != MT7988_CAPS || eth->hwver != MTK_HWID_V1)
+		if (eth->soc->caps != MT7988_CAPS || eth->hwver != MTK_HWID_V1){
 			mtk_w32(eth, PSE_DUMMY_WORK_GDM(1) |
 				PSE_DUMMY_WORK_GDM(2) |	PSE_DUMMY_WORK_GDM(3) |
 				DUMMY_PAGE_THR, PSE_DUMY_REQ);
+		printk("mt7988 v2");
+		}
+		else
+		printk("mt7988 v1");
 
 		/* PSE should not drop port8 and port9 packets */
 		mtk_w32(eth, 0x00000300, PSE_NO_DROP_CFG);
@@ -5976,7 +5980,7 @@ static const struct mtk_soc_data mt7981_data = {
 static const struct mtk_soc_data mt7988_data = {
 	.reg_map = &mt7988_reg_map,
 	.ana_rgc3 = 0x128,
-	.caps = MT7988_CAPS | MTK_HWLRO,
+	.caps = MT7988_CAPS,
 	.hw_features = MTK_HW_FEATURES,
 	.required_clks = MT7988_CLKS_BITMAP,
 	.required_pctl = false,
