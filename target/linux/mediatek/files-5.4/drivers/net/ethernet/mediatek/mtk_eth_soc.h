@@ -1639,7 +1639,7 @@ enum mkt_eth_capabilities {
 		       MTK_GMAC1_USXGMII | MTK_GMAC2_USXGMII | \
 		       MTK_GMAC3_USXGMII | MTK_MUX_GMAC123_TO_USXGMII | \
 		       MTK_GMAC2_XGMII | MTK_MUX_GMAC2_TO_XGMII | MTK_RSS | \
-		       MTK_NETSYS_RX_V2 | MTK_8GB_ADDRESSING)
+		        MTK_HWLRO | MTK_NETSYS_RX_V2 | MTK_8GB_ADDRESSING)
 
 struct mtk_tx_dma_desc_info {
 	dma_addr_t	addr;
